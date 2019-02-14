@@ -22,7 +22,7 @@ defp start config do
 
   server_components = 
     for _ <- 1 .. config.n_servers do 
-      receive do { :config, r, a, l } -> { r, a, l } end 
+      receive do { :config, replica, acceptor, leader } -> { replica, acceptor, leader } end 
     end
 
   { replicas, acceptors, leaders } = DAC.unzip3 server_components
