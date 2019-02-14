@@ -31,10 +31,12 @@ defmodule Replica do
     receive do
       { :request, client} ->
         propose(leaders, MapSet.put(clients, client))
-      { :decision, slot_number, cmd } ->
-        decision = Map.get(state, :decision)
-        decision = MapSet.put(decision, { slot_number, cmd })
-        state = Map.put(state, :decision, decision)
+
+      { :decision, d_slot_no, d_cmd } ->
+        decisions = Map.get(state, :decisions)
+        decisions = MapSet.put(decisions, { d_slot_no, d_cmd })
+        state = Map.put(state, :decisions, decisions)
+
         # loop through decision to find a c' that has the same slot number as the cur slot_out in state
         # for each of the command with the same slot number:
           # for each of pair { slot_num, c''} in the proposals
@@ -44,6 +46,29 @@ defmodule Replica do
             #
           #
           # perform(c')
+
+        for { slot_no, com } = d <- decisions, do: process_decision(state, d)
+    end
+
+    propose(state)
+  end
+
+  defp process_decisions(state, { d_slot_no, d_com }) do
+    if slot_no == state.slot_no do
+      proposals = Enum.filter(state.proposals, fn { p_slot_no, p_com } ->
+        # TODO: check if commands are equal
+        commands_equal = true
+
+        if commands_equal do
+          requests = Map.get(state, :requests)
+          requests = MapSet.put(requests, { p_com })
+          state = Map.put(state, :requests, requests)
+        end
+
+        commands_equal
+      end)
+
+      perform(com)
     end
   end
 end

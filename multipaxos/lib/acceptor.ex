@@ -10,9 +10,10 @@ defmodule Acceptor do
         if ballot_suggest > curr_ballot do
           curr_ballot = ballot_suggest
         end
-        send sender, { :p1b, self(), curr_ballot, accepted}
+        send sender, { :p1b, self(), curr_ballot, accepted }
         listen(config, curr_ballot, accepted)
-      { :p2a, sender, { ballot_suggest, slot_number, command} = package} ->
+
+      { :p2a, sender, { ballot_suggest, slot_number, command } = package} ->
         if ballot_suggest == curr_ballot do
           listen(config, curr_ballot, MapSet.put(accepted, package))
         else
