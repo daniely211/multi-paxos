@@ -1,3 +1,0 @@
-defmodule Replicas do
-  
-end

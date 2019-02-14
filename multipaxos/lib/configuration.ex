@@ -1,3 +1,4 @@
+# Daniel Yung (lty16) Tim Green (tpg16)
 
 # distributed algorithms, n.dulay, 11 feb 19
 # multi-paxos, configuration parameters v3

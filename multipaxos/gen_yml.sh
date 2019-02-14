@@ -1,3 +1,5 @@
+# Daniel Yung (lty16) Tim Green (tpg16)
+
 #!/bin/bash
 
 # distributed algorithms, n.dulay 11 feb 19

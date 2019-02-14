@@ -1,3 +1,4 @@
+# Daniel Yung (lty16) Tim Green (tpg16)
 
 # distributed algorithms, n.dulay 11 feb 19
 # coursework 2, paxos made moderately complex
@@ -18,4 +19,3 @@ def start config, server_num, multipaxos, monitor do
 end # start
 
 end # Server
-
