@@ -54,21 +54,20 @@ defmodule Replica do
   end
 
   defp process_decisions(state, { d_slot_no, d_com }) do
-    if slot_no == state.slot_no do
-      proposals = Enum.filter(state.proposals, fn { p_slot_no, p_com } ->
+    if d_slot_no == Map.get(state, :slot_out) do
+      proposals_slot_out = Enum.filter(Map.get(state, :proposal), fn { d_slot_no, p_com } ->
         # TODO: check if commands are equal
-        commands_equal = true
-
-        if commands_equal do
+        if d_com != p_com do
           requests = Map.get(state, :requests)
           requests = MapSet.put(requests, { p_com })
           state = Map.put(state, :requests, requests)
         end
-
-        commands_equal
+        #kinda need to remove it in the loop tho...
       end)
-
-      perform(com)
+      # remove all the proposal that has the same Slot number
+      new_proposal = MapSet.difference(Map.get(state, :proposal), proposals_slot_out)
+      perform(d_com)
+      for
     end
   end
 end
