@@ -8,11 +8,16 @@ defmodule Replica do
       slot_out: 1,
       requests: MapSet.new(),
       proposals: MapSet.new(),
-      decision: MapSet.new()
+      decision: MapSet.new(),
+      leaders: MapSet.new()
     }
 
     receive do
-      { :replica_bind_leader, leaders } -> listen(initial_state, leaders)
+      { :replica_bind_leader, leaders } ->
+        state = Map.get_and_update(state, :leaders, fn val ->
+          { val, leaders }
+        end)
+        listen(state)
     end
   end
 
@@ -37,6 +42,8 @@ defmodule Replica do
 
         Enum.each(Map.get(state, :decisions), fn { d_slot_no, { _x, _y, op } } ->
           if d_slot_no == slot_in do
+            # TODO: may need to figure out how to remove it from requests list
+            # within the iteration
             remove_requests = MapSet.put(remove_requests, c)
 
             proposals = Map.get(state, :proposals)
@@ -51,12 +58,14 @@ defmodule Replica do
       end
     end)
 
-    new_requests = MapSet.difference(requests, remove_requests)
-    state = Map.put(state, :requests, new_requests)
+    requests = MapSet.difference(requests, remove_requests)
+    state = Map.put(state, :requests, requests)
+
+    listen(state)
   end
 
   def isreconfig(op) do
-    # TODO: what is this for
+    # TODO: figure out what a reconfig operation looks like
   end
 
   def perform(state, { client, cid, op } = com) do
@@ -66,6 +75,7 @@ defmodule Replica do
       if d_slot_no < slot_out or isreconfig(op) do
         Map.put(state, :slot_out, slot_out + 1)
       else
+        # TODO
         # { next, result } = op(state)
         # atomic: state = next
         # slot_out += 1
@@ -75,14 +85,12 @@ defmodule Replica do
     end)
   end
 
-  def listen(state, leaders) do
+  def listen(state) do
     receive do
-      { :request, client } ->
+      { :client_request, client } ->
         requests = Map.get(state, :requests)
         requests = MapSet.put(requests, { d_slot_no, d_cmd })
         state = Map.put(state, :requests, requests)
-
-        # TODO: check this is right
         propose(state)
 
       { :decision, d_slot_no, d_cmd } ->
@@ -90,36 +98,34 @@ defmodule Replica do
         decisions = MapSet.put(decisions, { d_slot_no, d_cmd })
         state = Map.put(state, :decisions, decisions)
 
-        for { slot_no, com } = d <- decisions, do: process_decision(state, d)
-    end
+        for { slot_no, com } = d <- decisions, do
+          slot_out = Map.get(state, :slot_out)
 
-    propose(state)
-  end
+          if d_slot_no == slot_out do
+            proposals = Map.get(state, :proposals)
+            remove_proposals = MapSet.new()
 
-  defp process_decisions(state, { d_slot_no, d_com }) do
-    slot_out = Map.get(state, :slot_out)
+            Enum.each(proposals, fn { p_slot_no, p_com } ->
 
-    if d_slot_no == slot_out do
-      proposals = Map.get(state, :proposals)
-      remove_proposals = MapSet.new()
+              if p_slot_no == slot_out do
+                remove_proposals = MapSet.put(remove_proposals, { p_slot_no, p_com })
 
-      Enum.each(proposals, fn { p_slot_no, p_com } ->
+                if d_com != p_com do
+                  requests = Map.get(state, :requests)
+                  requests = MapSet.put(requests, { p_com })
+                  state = Map.put(state, :requests, requests)
+                end
+              end
+            end)
 
-        if p_slot_no == slot_out do
-          remove_proposals = MapSet.put(remove_proposals, { p_slot_no, p_com })
+            proposals = MapSet.difference(proposals, remove_proposals)
+            state = Map.put(state, :proposals, proposals)
 
-          if d_com != p_com do
-            requests = Map.get(state, :requests)
-            requests = MapSet.put(requests, { p_com })
-            state = Map.put(state, :requests, requests)
+            perform(state, d_com)
           end
         end
-      end)
 
-      new_proposals = MapSet.difference(proposals, remove_proposals)
-      state = Map.put(state, :proposals, new_proposals)
-
-      perform(state, d_com)
+        propose(state)
     end
   end
 end
