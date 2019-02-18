@@ -76,7 +76,7 @@ defmodule Leader do
   def pmax(pvals) do
     # get unique slot numbers in pval list
     slot_nums = Enum.uniq(Enum.map(pvals, fn {_b, s, _c} -> s end))
-    new_pvals = MapSet.new()
+    max_pvals = MapSet.new()
 
     for slot_number <- slot_nums, do
       # get all the relevant pval for this slot number first
@@ -86,10 +86,10 @@ defmodule Leader do
       # find the command with the highest ballot count
       [{ _, _, max_cmd } | _] = Enum.filter(pvals_slot, fn { { b, _pid }, s , c } -> b == max_b  end)
       # add the new pair {s, c} into the list
-      new_pvals = MapSet.put(new_pvals, { slot_number, max_cmd })
+      max_pvals = MapSet.put(max_pvals, { slot_number, max_cmd })
     end
 
-    new_pvals
+    max_pvals
   end
 
   # test_pval = [{1, 0, 'cmd1'}, {2, 0, 'cmd3'}, {1, 0, 'cmd3'}, {5, 1, 'cmd1'}, {4, 1, 'cmd0'}]
