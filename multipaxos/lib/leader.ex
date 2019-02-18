@@ -94,7 +94,7 @@ defmodule Leader do
     pvals
   end
 
-  test_pval = [{1, 0, 'cmd1'}, {2, 0, 'cmd3'}, {1, 0, 'cmd3'}, {5, 1, 'cmd1'}, {4, 1, 'cmd0'}]
+  # test_pval = [{1, 0, 'cmd1'}, {2, 0, 'cmd3'}, {1, 0, 'cmd3'}, {5, 1, 'cmd1'}, {4, 1, 'cmd0'}]
 
   defp triangle_function(proposals, pmax) do
     filtered_proposals = Enum.filter(proposals, fn { p_slot_no, _x } ->
