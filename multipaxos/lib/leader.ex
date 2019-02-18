@@ -73,33 +73,31 @@ defmodule Leader do
     end
   end
 
-  # NEED TO TEST THIS SHIT
   def pmax(pvals) do
     # get unique slot numbers in pval list
-    slot_nums = Enum.uniq(Enum.map(pvals, fn {_b, s, _c} -> s) end)
+    slot_nums = Enum.uniq(Enum.map(pvals, fn {_b, s, _c} -> s end))
+    new_pvals = MapSet.new()
+
     for slot_number <- slot_nums, do
       # get all the relevant pval for this slot number first
       pvals_slot = Enum.filter(pvals, fn { _b, s ,_c } -> s == slot_number end)
-      # find the max broadcast first
-      max_b = Enum.max(Enum.map(pvals_slot, fn {b, _s, _c} -> b end))
+      # find the max ballot count first
+      max_b = Enum.max(Enum.map(pvals_slot, fn { { b, _pid} , _s, _c } -> b end))
       # find the command with the highest ballot count
-      [{_, _, max_cmd}| tails] = Enum.filter(pvals_slot, fn { b, s , c } -> b == max_b  end)
-      # update the pval list into s c
-      pvals = Enum.map(pvals, fn {b, s, c} ->
-        if s == slot_number do
-          {s, max_cmd} # not sure
-        end
-      end)
+      [{ _, _, max_cmd } | _] = Enum.filter(pvals_slot, fn { { b, _pid }, s , c } -> b == max_b  end)
+      # add the new pair {s, c} into the list
+      new_pvals = MapSet.put(new_pvals, { slot_number, max_cmd })
     end
-    pvals
+
+    new_pvals
   end
 
   # test_pval = [{1, 0, 'cmd1'}, {2, 0, 'cmd3'}, {1, 0, 'cmd3'}, {5, 1, 'cmd1'}, {4, 1, 'cmd0'}]
 
   defp triangle_function(proposals, pmax) do
-    filtered_proposals = Enum.filter(proposals, fn { p_slot_no, _x } ->
-      not Enum.any?(pmax, fn { pm_slot_no, _y } -> pm_slot_no == slot_no end)
-    end)
+    filtered_proposals = MapSet.new(Enum.filter(proposals, fn { p_slot_no, _x } ->
+      not Enum.any?(pmax, fn { pm_slot_no, _y } -> pm_slot_no == p_slot_no end)
+    end))
 
     MapSet.union(filtered_proposals, pmax)
   end
