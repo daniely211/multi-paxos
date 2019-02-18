@@ -37,16 +37,6 @@ defmodule Replica do
         decisions = MapSet.put(decisions, { d_slot_no, d_cmd })
         state = Map.put(state, :decisions, decisions)
 
-        # loop through decision to find a c' that has the same slot number as the cur slot_out in state
-        # for each of the command with the same slot number:
-          # for each of pair { slot_num, c''} in the proposals
-            # remove the pair
-            # check if c' == c''
-              # add the c'' into request
-            #
-          #
-          # perform(c')
-
         for { slot_no, com } = d <- decisions, do: process_decision(state, d)
     end
 
@@ -64,6 +54,7 @@ defmodule Replica do
         end
         #kinda need to remove it in the loop tho...
       end)
+
       # remove all the proposal that has the same Slot number
       new_proposal = MapSet.difference(Map.get(state, :proposal), proposals_slot_out)
       perform(d_com)
