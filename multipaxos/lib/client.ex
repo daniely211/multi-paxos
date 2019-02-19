@@ -36,8 +36,8 @@ defmodule Client do
       cmd = { self(), sent, transaction }
 
       for r <- 1..quorum do
-          replica = Enum.at replicas, rem(sent+r, config.n_servers)
-          send replica, { :client_request, cmd }
+        replica = Enum.at replicas, rem(sent+r, config.n_servers)
+        send replica, { :client_request, cmd }
       end
 
       if sent == config.max_requests, do: send self(), :client_stop

@@ -1,7 +1,7 @@
 # Daniel Yung (lty16) Tim Green (tpg16)
 
 defmodule Scout do
-  def start(leader_pid, acceptors, ballot_numb) do
+  def start(leader_pid, acceptors, ballot_num) do
     state = %{
       acceptors: acceptors,
       leader: leader_pid,
@@ -9,8 +9,8 @@ defmodule Scout do
       pvalues: MapSet.new()
     }
 
-    for acceptor <- acceptors, do
-      send acceptor, { :p1a, self(), ballot_number }
+    for acceptor <- acceptors do
+      send acceptor, { :p1a, self(), ballot_num }
       listen(state, acceptors)
     end
   end

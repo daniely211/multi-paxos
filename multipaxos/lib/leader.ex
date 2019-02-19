@@ -13,7 +13,7 @@ defmodule Leader do
     receive do
       { :leader_bind_acc_repl, acceptors, replicas } ->
         state = %{ state | acceptors: acceptors, replicas: replicas }
-        spawn(Scout, :start, [self(), acceptors, Map.get(state, :ballot_number)]))
+        spawn(Scout, :start, [self(), acceptors, Map.get(state, :ballot_number)])
         listen(state)
     end
   end
@@ -21,12 +21,13 @@ defmodule Leader do
   def listen(state) do
     receive do
       { :propose, slot_no, com } ->
-        proposal_exists = Enum.any?(proposals, fn { p_slot_no, p_com } ->
+        proposals = Map.get(state, :proposals)
+
+        proposal_exists = Enum.any?(proposals, fn { p_slot_no, _c } ->
           p_slot_no == slot_no
         end)
 
         if not proposal_exists do
-          proposals = Map.get(state, :proposals)
           proposals = MapSet.put(proposals, { slot_no, com })
           state = %{ state | proposals: proposals }
 
@@ -36,7 +37,7 @@ defmodule Leader do
             ballot_number = Map.get(state, :ballot_number)
             message = { ballot_number, slot_no, com }
 
-            spawn(Commander, :start, [self(), acceptors, replicas, message]))
+            spawn(Commander, :start, [self(), acceptors, replicas, message])
           end
 
           listen(state)
@@ -45,14 +46,14 @@ defmodule Leader do
         listen(state)
 
       { :adopted, ballot_num, pvals } ->
+        proposals = Map.get(state, :proposals)
         proposals = triangle_function(proposals, pmax(pvals))
         state = %{ state | proposals: proposals }
 
         Enum.each(proposals, fn { p_slot_no, p_com } ->
           acceptors = Map.get(state, :acceptors)
           replicas = Map.get(state, :replicas)
-          ballot_number = Map.get(state, :ballot_number)
-          message = { ballot_number, slot_no, com }
+          message = { ballot_num, p_slot_no, p_com }
 
           spawn(Commander, :start, [self(), acceptors, replicas, message])
         end)
@@ -60,7 +61,7 @@ defmodule Leader do
         state = %{ state | active: true }
         listen(state)
 
-      { :preempted, { r_ballot_number, r_pid } } ->
+      { :preempted, { r_ballot_number, _r_pid } } ->
         { b_num, _ } = Map.get(state, :ballot_number)
 
         if r_ballot_number > b_num do
@@ -79,9 +80,8 @@ defmodule Leader do
   defp pmax(pvals) do
     # get unique slot numbers in pval list
     slot_nums = Enum.uniq(Enum.map(pvals, fn {_b, s, _c} -> s end))
-    max_pvals = MapSet.new()
 
-    max_pvals = Enum.map(slot_nums, fn slot_nums ->
+    max_pvals = Enum.map(slot_nums, fn slot_number ->
       # get all the relevant pval for this slot number first
       pvals_slot = Enum.filter(pvals, fn { _b, s ,_c } -> s == slot_number end)
       # find the max ballot count first

@@ -11,7 +11,7 @@ defmodule Commander do
       command: cmd
     }
 
-    for acceptor <- acceptors, do
+    for acceptor <- acceptors do
       send acceptor, { :p2a, self(), message }
       listen(state, acceptors)
     end
@@ -20,12 +20,12 @@ defmodule Commander do
   def listen(state, waitfor) do
     receive do
       { :p2b, acceptor_pid, b_suggest } ->
-        if b_suggest == ballot do
+        if b_suggest == Map.get(state, :ballot) do
           waitfor = List.delete(waitfor, acceptor_pid)
-          if length(waitfor) < (length(Map.get(state, :acceptors)) / 2)do
+          if length(waitfor) < (length(Map.get(state, :acceptors)) / 2) do
             # a majority has been reached, so send the decision aroun to all the replica
             replicas = Map.get(state, :replicas)
-            for replica <- replicas, do
+            for replica <- replicas do
               send replica, { :decision, Map.get(state, :slot_number), Map.get(state, :command) }
               # do not recurse here
             end

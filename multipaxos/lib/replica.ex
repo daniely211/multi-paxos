@@ -2,20 +2,22 @@
 
 defmodule Replica do
   def start(config, database, monitor) do
-    initial_state = %{
+    state = %{
       clients: MapSet.new(),
       slot_in: 1,
       slot_out: 1,
       window: 1,
       requests: MapSet.new(),
       proposals: MapSet.new(),
-      decision: MapSet.new(),
-      leaders: MapSet.new()
+      decisions: MapSet.new(),
+      leaders: MapSet.new(),
+      database: database
     }
 
     receive do
       { :replica_bind_leader, leaders } ->
-        state = Map.get_and_update(state, :leaders, fn val -> { val, leaders } end)
+        { _, s } = Map.get_and_update(state, :leaders, fn val -> { val, leaders } end)
+        state = s
         listen(state)
     end
   end
@@ -26,6 +28,8 @@ defmodule Replica do
     window = Map.get(state, :window)
     requests = Map.get(state, :requests)
     proposals = Map.get(state, :proposals)
+    decisions = Map.get(state, :decisions)
+    leaders = Map.get(state, :leaders)
 
     if slot_in < slot_out + window and MapSet.size(requests) > 0 do
 
@@ -37,7 +41,7 @@ defmodule Replica do
 
         state = %{ state | proposals: proposals, requests: requests }
 
-        for leader <- leaders, do: send leader { :propose, slot_in, req_arb }
+        for leader <- leaders, do: send leader, { :propose, slot_in, req_arb }
 
         state = %{ state | slot_out: slot_out + 1 }
         propose(state)
@@ -58,21 +62,25 @@ defmodule Replica do
       decisions_ready(state)
     else
       # TODO
-      # { next, result } = op(state)
+      database = Map.get(state, :database)
+      send database, { :execute, op }
+      IO.puts "send #{inspect op}"
+
+      # TODO:
       # atomic:
         # state = next
         # slot_out += 1
 
-      send client, { :response, cid, result }
+      # send client, { :response, cid, result }
       decisions_ready(state)
     end
   end
 
   def listen(state) do
     receive do
-      { :client_request, client } ->
+      { :client_request, req } ->
         requests = Map.get(state, :requests)
-        requests = MapSet.put(requests, { d_slot_no, d_cmd })
+        requests = MapSet.put(requests, req)
         state = %{ state | requests: requests }
         propose(state)
 
@@ -102,7 +110,7 @@ defmodule Replica do
 
       if length(prop_conflicted) > 0 do
         # there is a conflicting proposal at this current slot
-        { _s, cmd_pp } = Enum.random(prop_conflicted)
+        { slot_num_prop, cmd_pp } = Enum.random(prop_conflicted)
         # remove the conflicting proposal
         proposals = MapSet.delete(proposals, { slot_num_prop, cmd_pp })
         state = %{ state | proposals: proposals }

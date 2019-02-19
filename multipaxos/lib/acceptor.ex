@@ -9,12 +9,14 @@ defmodule Acceptor do
     receive do
       { :p1a, sender, ballot_suggest } ->
         if ballot_suggest > curr_ballot do
-          curr_ballot = ballot_suggest
+          send sender, { :p1b, self(), ballot_suggest, accepted }
+          listen(config, ballot_suggest, accepted)
+        else
+          send sender, { :p1b, self(), ballot_suggest, accepted }
+          listen(config, ballot_suggest, accepted)
         end
-        send sender, { :p1b, self(), curr_ballot, accepted }
-        listen(config, curr_ballot, accepted)
 
-      { :p2a, sender, { ballot_suggest, slot_number, command } = package} ->
+      { :p2a, sender, { ballot_suggest, _s, _c } = package} ->
         if ballot_suggest == curr_ballot do
           listen(config, curr_ballot, MapSet.put(accepted, package))
         else
