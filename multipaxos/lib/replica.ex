@@ -6,6 +6,7 @@ defmodule Replica do
       clients: MapSet.new(),
       slot_in: 1,
       slot_out: 1,
+      window: 1,
       requests: MapSet.new(),
       proposals: MapSet.new(),
       decision: MapSet.new(),
@@ -14,75 +15,57 @@ defmodule Replica do
 
     receive do
       { :replica_bind_leader, leaders } ->
-        state = Map.get_and_update(state, :leaders, fn val ->
-          { val, leaders }
-        end)
+        state = Map.get_and_update(state, :leaders, fn val -> { val, leaders } end)
         listen(state)
     end
   end
 
   def propose(state) do
+    slot_in = Map.get(state, :slot_in)
+    slot_out = Map.get(state, :slot_out)
     window = Map.get(state, :window)
-
     requests = Map.get(state, :requests)
-    remove_requests = MapSet.new()
+    proposals = Map.get(state, :proposals)
 
-    Enum.each(requests, fn c ->
-      slot_in = Map.get(state, :slot_in)
-      slot_out = Map.get(state, :slot_out)
+    if slot_in < slot_out + window and MapSet.size(requests) > 0 do
 
-      if slot_in < slot_out + window do
-        leaders = MapSet.new()
+      # if there are no decisions with the current slot numbe
+      if not Enum.any?(decisions, fn { s, _cmd } -> s == slot_in end) do
+        req_arb = Enum.random(requests)
+        requests = MapSet.delete(requests, req_arb)
+        proposals = MapSet.put(proposals, { slot_in, req_arb })
 
-        Enum.each(Map.get(state, :decisions), fn { d_slot_no, { _x, _y, op } } ->
-          if isreconfig(op) do
-            leaders = op.leaders
-          end
-        end)
+        state = %{ state | proposals: proposals, requests: requests }
 
-        Enum.each(Map.get(state, :decisions), fn { d_slot_no, { _x, _y, op } } ->
-          if d_slot_no == slot_in do
-            # TODO: may need to figure out how to remove it from requests list
-            # within the iteration
-            remove_requests = MapSet.put(remove_requests, c)
+        for leader <- leaders, do: send leader { :propose, slot_in, req_arb }
 
-            proposals = Map.get(state, :proposals)
-            proposals = MapSet.put(proposals, { slot_in, c })
-            state = Map.put(state, :proposals, proposals)
-
-            for leader <- leaders, do: send leader { :propose, slot_in, c }
-          end
-        end)
-
-        Map.put(state, :slot_in, slot_in + 1)
+        state = %{ state | slot_out: slot_out + 1 }
+        propose(state)
+      else
+        state = %{ state | slot_out: slot_out + 1 }
+        propose(state)
       end
-    end)
-
-    requests = MapSet.difference(requests, remove_requests)
-    state = Map.put(state, :requests, requests)
-
-    listen(state)
+    else
+      listen(state)
+    end
   end
 
-  def isreconfig(op) do
-    # TODO: figure out what a reconfig operation looks like
-  end
-
-  def perform(state, { client, cid, op } = com) do
+  def perform(state, { client, cid, op }) do
     slot_out = Map.get(state, :slot_out)
 
-    Enum.each(Map.get(state, :decisions), fn { d_slot_no, { client, cid, op } }) ->
-      if d_slot_no < slot_out or isreconfig(op) do
-        Map.put(state, :slot_out, slot_out + 1)
-      else
-        # TODO
-        # { next, result } = op(state)
-        # atomic: state = next
+    if Enum.any?(Map.get(state, :decisions), fn { s, _c } -> s < slot_out end) do
+      state = %{ state | slot_out: slot_out + 1 }
+      decisions_ready(state)
+    else
+      # TODO
+      # { next, result } = op(state)
+      # atomic:
+        # state = next
         # slot_out += 1
 
-        send client { :response, cid, result }
-      end
-    end)
+      send client, { :response, cid, result }
+      decisions_ready(state)
+    end
   end
 
   def listen(state) do
@@ -90,42 +73,55 @@ defmodule Replica do
       { :client_request, client } ->
         requests = Map.get(state, :requests)
         requests = MapSet.put(requests, { d_slot_no, d_cmd })
-        state = Map.put(state, :requests, requests)
+        state = %{ state | requests: requests }
         propose(state)
 
       { :decision, d_slot_no, d_cmd } ->
         decisions = Map.get(state, :decisions)
         decisions = MapSet.put(decisions, { d_slot_no, d_cmd })
-        state = Map.put(state, :decisions, decisions)
+        state = %{ state | decisions: decisions }
+        decisions_ready(state)
 
-        for { slot_no, com } = d <- decisions, do
-          slot_out = Map.get(state, :slot_out)
+    end
+  end
 
-          if d_slot_no == slot_out do
-            proposals = Map.get(state, :proposals)
-            remove_proposals = MapSet.new()
+  defp decisions_ready(state) do
+    decisions = Map.get(state, :decisions)
+    proposals = Map.get(state, :proposals)
+    requests = Map.get(state, :requests)
+    slot_out = Map.get(state, :slot_out)
 
-            Enum.each(proposals, fn { p_slot_no, p_com } ->
+    d_ready = Enum.filter(decisions, fn { slot_num, _c } -> slot_out == slot_num end)
+    # find all the cmd in the decision that are ready
+    if length(d_ready) > 0 do
+      { _s, cmd_p } = Enum.random(d_ready)
 
-              if p_slot_no == slot_out do
-                remove_proposals = MapSet.put(remove_proposals, { p_slot_no, p_com })
+      # there is at least 1 ready
+      # find if there are any proposals at the current slot out
+      prop_conflicted = Enum.filter(proposals, fn { slot_num, _c } -> slot_out == slot_num end)
 
-                if d_com != p_com do
-                  requests = Map.get(state, :requests)
-                  requests = MapSet.put(requests, { p_com })
-                  state = Map.put(state, :requests, requests)
-                end
-              end
-            end)
+      if length(prop_conflicted) > 0 do
+        # there is a conflicting proposal at this current slot
+        { _s, cmd_pp } = Enum.random(prop_conflicted)
+        # remove the conflicting proposal
+        proposals = MapSet.delete(proposals, { slot_num_prop, cmd_pp })
+        state = %{ state | proposals: proposals }
 
-            proposals = MapSet.difference(proposals, remove_proposals)
-            state = Map.put(state, :proposals, proposals)
-
-            perform(state, d_com)
-          end
+        # if the commands are different then put it in request so it will be proposed again
+        if cmd_pp != cmd_p do
+          requests = MapSet.put(requests, cmd_pp)
+          state = %{ state | requests: requests }
+          perform(state, cmd_p)
+        else
+          perform(state, cmd_p)
         end
-
-        propose(state)
+      end
+      # there are no conflicted proposals
+      { _, cmd_p } = Enum.random(d_ready)
+      perform(state, cmd_p)
+    else
+      # there are no decisions command ready
+      propose(state)
     end
   end
 end

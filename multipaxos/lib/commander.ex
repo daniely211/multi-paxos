@@ -22,7 +22,7 @@ defmodule Commander do
       { :p2b, acceptor_pid, b_suggest } ->
         if b_suggest == ballot do
           waitfor = List.delete(waitfor, acceptor_pid)
-          if length(waitfor) < length(Map.get(state, :acceptors)) / 2 do
+          if length(waitfor) < (length(Map.get(state, :acceptors)) / 2)do
             # a majority has been reached, so send the decision aroun to all the replica
             replicas = Map.get(state, :replicas)
             for replica <- replicas, do
