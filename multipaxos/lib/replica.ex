@@ -18,11 +18,11 @@ defmodule Replica do
       { :replica_bind_leader, leaders } ->
         { _, s } = Map.get_and_update(state, :leaders, fn val -> { val, leaders } end)
         state = s
-        listen(state)
+        listen(state, config)
     end
   end
 
-  def propose(state) do
+  def propose(state, config) do
     slot_in = Map.get(state, :slot_in)
     slot_out = Map.get(state, :slot_out)
     window = Map.get(state, :window)
@@ -44,27 +44,26 @@ defmodule Replica do
         for leader <- leaders, do: send leader, { :propose, slot_in, req_arb }
 
         state = %{ state | slot_out: slot_out + 1 }
-        propose(state)
+        propose(state, config)
       else
         state = %{ state | slot_out: slot_out + 1 }
-        propose(state)
+        propose(state, config)
       end
     else
-      listen(state)
+      listen(state, config)
     end
   end
 
-  def perform(state, { client, cid, op }) do
+  def perform(state, { client, cid, op }, config) do
     slot_out = Map.get(state, :slot_out)
 
     if Enum.any?(Map.get(state, :decisions), fn { s, _c } -> s < slot_out end) do
       state = %{ state | slot_out: slot_out + 1 }
-      decisions_ready(state)
+      decisions_ready(state, config)
     else
       # TODO
       database = Map.get(state, :database)
       send database, { :execute, op }
-      IO.puts "send #{inspect op} to DB!!"
 
       # TODO:
       # atomic:
@@ -72,29 +71,32 @@ defmodule Replica do
         # slot_out += 1
 
       # send client, { :response, cid, result }
-      decisions_ready(state)
+      decisions_ready(state, config)
     end
   end
 
-  def listen(state) do
+  def listen(state, config) do
     receive do
       { :client_request, req } ->
         requests = Map.get(state, :requests)
         requests = MapSet.put(requests, req)
         state = %{ state | requests: requests }
-        propose(state)
+        # send monitor
+        monitor = Map.get(config, :monitor)
+        server_num = Map.get(config, :server_num)
+        send monitor, { :client_request, server_num}
+        propose(state, config)
 
       { :decision, d_slot_no, d_cmd } ->
-        IO.puts "DECISION READY!!!"
         decisions = Map.get(state, :decisions)
         decisions = MapSet.put(decisions, { d_slot_no, d_cmd })
         state = %{ state | decisions: decisions }
-        decisions_ready(state)
+        decisions_ready(state, config)
 
     end
   end
 
-  defp decisions_ready(state) do
+  defp decisions_ready(state, config) do
     decisions = Map.get(state, :decisions)
     proposals = Map.get(state, :proposals)
     requests = Map.get(state, :requests)
@@ -103,6 +105,7 @@ defmodule Replica do
     d_ready = Enum.filter(decisions, fn { slot_num, _c } -> slot_out == slot_num end)
     # find all the cmd in the decision that are ready
     if length(d_ready) > 0 do
+
       { _s, cmd_p } = Enum.random(d_ready)
 
       # there is at least 1 ready
@@ -120,17 +123,17 @@ defmodule Replica do
         if cmd_pp != cmd_p do
           requests = MapSet.put(requests, cmd_pp)
           state = %{ state | requests: requests }
-          perform(state, cmd_p)
+          perform(state, cmd_p, config)
         else
-          perform(state, cmd_p)
+          perform(state, cmd_p, config)
         end
       end
       # there are no conflicted proposals
       { _, cmd_p } = Enum.random(d_ready)
-      perform(state, cmd_p)
+      perform(state, cmd_p, config)
     else
       # there are no decisions command ready
-      propose(state)
+      propose(state, config)
     end
   end
 end

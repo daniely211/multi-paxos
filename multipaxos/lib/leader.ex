@@ -55,7 +55,6 @@ defmodule Leader do
             replicas = Map.get(state, :replicas)
             ballot_number = Map.get(state, :ballot_number)
             message = { ballot_number, slot_no, com }
-            IO.puts "SPAWNING COMMANDER in propose"
             spawn(Commander, :start, [self(), acceptors, replicas, message])
           end
 
