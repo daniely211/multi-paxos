@@ -6,7 +6,7 @@ defmodule Replica do
       clients: MapSet.new(),
       slot_in: 1,
       slot_out: 1,
-      window: 1,
+      window: 10,
       requests: MapSet.new(),
       proposals: MapSet.new(),
       decisions: MapSet.new(),
@@ -64,7 +64,7 @@ defmodule Replica do
       # TODO
       database = Map.get(state, :database)
       send database, { :execute, op }
-      IO.puts "send #{inspect op}"
+      IO.puts "send #{inspect op} to DB!!"
 
       # TODO:
       # atomic:
@@ -85,6 +85,7 @@ defmodule Replica do
         propose(state)
 
       { :decision, d_slot_no, d_cmd } ->
+        IO.puts "DECISION READY!!!"
         decisions = Map.get(state, :decisions)
         decisions = MapSet.put(decisions, { d_slot_no, d_cmd })
         state = %{ state | decisions: decisions }

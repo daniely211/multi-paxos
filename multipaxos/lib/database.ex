@@ -14,7 +14,6 @@ defp next config, monitor, db_seqnum, balances do
   receive do
     { :execute, transaction } ->
       { :move, amount, account1, account2 } = transaction
-
       balance1 = Map.get balances, account1, 0
       balances = Map.put balances, account1, balance1 + amount
       balance2 = Map.get balances, account2, 0

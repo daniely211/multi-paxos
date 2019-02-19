@@ -18,9 +18,28 @@ defmodule Leader do
     end
   end
 
+  defp pmax(pvals) do
+    # get unique slot numbers in pval list
+    slot_nums = Enum.uniq(Enum.map(pvals, fn {_b, s, _c} -> s end))
+
+    max_pvals = MapSet.new(Enum.map(slot_nums, fn slot_number ->
+      # get all the relevant pval for this slot number first
+      pvals_slot = Enum.filter(pvals, fn { _b, s ,_c } -> s == slot_number end)
+      # find the max ballot count first
+      max_b = Enum.max(Enum.map(pvals_slot, fn { { b, _pid} , _s, _c } -> b end))
+      # find the command with the highest ballot count
+      [{ _, _, max_cmd } | _] = Enum.filter(pvals_slot, fn { { b, _pid }, _s , _c } -> b == max_b  end)
+      # add the new pair {s, c} into the list
+      { slot_number, max_cmd }
+    end))
+
+    max_pvals
+  end
+
   def listen(state) do
     receive do
       { :propose, slot_no, com } ->
+        active = Map.get(state, :active)
         proposals = Map.get(state, :proposals)
 
         proposal_exists = Enum.any?(proposals, fn { p_slot_no, _c } ->
@@ -31,12 +50,12 @@ defmodule Leader do
           proposals = MapSet.put(proposals, { slot_no, com })
           state = %{ state | proposals: proposals }
 
-          if Map.get(state, :active) do
+          if active do
             acceptors = Map.get(state, :acceptors)
             replicas = Map.get(state, :replicas)
             ballot_number = Map.get(state, :ballot_number)
             message = { ballot_number, slot_no, com }
-
+            IO.puts "SPAWNING COMMANDER in propose"
             spawn(Commander, :start, [self(), acceptors, replicas, message])
           end
 
@@ -46,6 +65,7 @@ defmodule Leader do
         listen(state)
 
       { :adopted, ballot_num, pvals } ->
+        # IO.puts "PVALS IN LEADER #{inspect pvals}"
         proposals = Map.get(state, :proposals)
         proposals = triangle_function(proposals, pmax(pvals))
         state = %{ state | proposals: proposals }
@@ -54,7 +74,6 @@ defmodule Leader do
           acceptors = Map.get(state, :acceptors)
           replicas = Map.get(state, :replicas)
           message = { ballot_num, p_slot_no, p_com }
-
           spawn(Commander, :start, [self(), acceptors, replicas, message])
         end)
 
@@ -77,23 +96,7 @@ defmodule Leader do
     end
   end
 
-  defp pmax(pvals) do
-    # get unique slot numbers in pval list
-    slot_nums = Enum.uniq(Enum.map(pvals, fn {_b, s, _c} -> s end))
 
-    max_pvals = Enum.map(slot_nums, fn slot_number ->
-      # get all the relevant pval for this slot number first
-      pvals_slot = Enum.filter(pvals, fn { _b, s ,_c } -> s == slot_number end)
-      # find the max ballot count first
-      max_b = Enum.max(Enum.map(pvals_slot, fn { { b, _pid} , _s, _c } -> b end))
-      # find the command with the highest ballot count
-      [{ _, _, max_cmd } | _] = Enum.filter(pvals_slot, fn { { b, _pid }, _s , _c } -> b == max_b  end)
-      # add the new pair {s, c} into the list
-      { slot_number, max_cmd }
-    end)
-
-    max_pvals
-  end
 
   defp triangle_function(proposals, pmax) do
     filtered_proposals = MapSet.new(Enum.filter(proposals, fn { p_slot_no, _x } ->
