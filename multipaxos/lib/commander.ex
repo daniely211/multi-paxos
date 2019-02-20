@@ -29,8 +29,11 @@ defmodule Commander do
             # a majority has been reached, so send the decision aroun to all the replica
 
             replicas = Map.get(state, :replicas)
+            cmd = Map.get(state, :command)
+            IO.puts "DECISION BEEN MADE! for ballot num: #{inspect curr_ball} to execute command #{inspect cmd}"
             for replica <- replicas do
-              send replica, { :decision, Map.get(state, :slot_num), Map.get(state, :command) }
+              IO.puts "I AM #{inspect pid} SENDING TO REPLICA #{inspect replica} about cmd #{inspect cmd}"
+              send replica, { :decision, Map.get(state, :slot_num), cmd }
               # do not recurse here
             end
           else

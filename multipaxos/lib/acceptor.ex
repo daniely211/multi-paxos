@@ -2,7 +2,6 @@
 
 defmodule Acceptor do
   def start(config) do
-    pid = self()
     listen(config, -1, MapSet.new())
   end
 

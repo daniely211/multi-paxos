@@ -19,38 +19,39 @@ defp next config, clock, requests, updates, transactions, scouts, commanders do
 
     if seqnum != done + 1  do
       IO.puts "  ** error db #{db}: seq #{seqnum} expecting #{done+1}"
-      System.halt 
+      System.halt
     end
 
-    transactions = 
+    transactions =
       case Map.get transactions, seqnum do
       nil ->
         # IO.puts "db #{db} seq #{seqnum} #{done}"
-        Map.put transactions, seqnum, %{ amount: amount, from: from, to: to }   
+        Map.put transactions, seqnum, %{ amount: amount, from: from, to: to }
 
       t -> # already logged - check transaction
         if amount != t.amount or from != t.from or to != t.to do
 	  IO.puts " ** error db #{db}.#{done} [#{amount},#{from},#{to}] " <>
             "= log #{done}/#{map_size transactions} [#{t.amount},#{t.from},#{t.to}]"
-          System.halt 
+          System.halt
         end
         transactions
       end # case
 
-    updates = Map.put updates, db, seqnum 
+    updates = Map.put updates, db, seqnum
     next config, clock, requests, updates, transactions, scouts, commanders
-      
+
   { :client_request, server_num } ->  # client requests seen by replicas
     seen = Map.get requests, server_num, 0
     requests = Map.put requests, server_num, seen + 1
+    IO.puts "MONITOR: #{inspect server_num} GOT A CLIENT REQUEST"
     next config, clock, requests, updates, transactions, scouts, commanders
 
-  { :scout_spawned, server_num } -> # increment active scouts  
+  { :scout_spawned, server_num } -> # increment active scouts
     spawned = Map.get scouts, server_num, 0
     scouts = Map.put scouts, server_num, spawned + 1
     next config, clock, requests, updates, transactions, scouts, commanders
 
-  { :scout_finished, server_num } -> # decrement active scouts 
+  { :scout_finished, server_num } -> # decrement active scouts
     scouts = Map.replace! scouts, server_num, scouts[server_num] - 1
     next config, clock, requests, updates, transactions, scouts, commanders
 
@@ -65,8 +66,8 @@ defp next config, clock, requests, updates, transactions, scouts, commanders do
 
   # ** ADD ADDITIONAL MESSAGES HERE
 
-  :print -> 
-    clock = clock + config.print_after 
+  :print ->
+    clock = clock + config.print_after
     sorted = updates |> Map.to_list |> List.keysort(0)
     IO.puts "time = #{clock}  updates done = #{inspect sorted}"
     sorted = requests |> Map.to_list |> List.keysort(0)
@@ -87,7 +88,7 @@ defp next config, clock, requests, updates, transactions, scouts, commanders do
     Process.send_after self(), :print, config.print_after
     next config, clock, requests, updates, transactions, scouts, commanders
 
-  _ -> 
+  _ ->
     IO.puts "monitor: unexpected message"
     System.halt
   end # receive

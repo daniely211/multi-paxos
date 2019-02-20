@@ -37,6 +37,7 @@ defmodule Client do
 
       for r <- 1..quorum do
         replica = Enum.at replicas, rem(sent+r, config.n_servers)
+        # IO.puts "CLIENT SENDING TO #{inspect replica}"
         send replica, { :client_request, cmd }
       end
 

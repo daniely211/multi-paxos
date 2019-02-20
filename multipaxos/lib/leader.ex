@@ -64,7 +64,6 @@ defmodule Leader do
         listen(state)
 
       { :adopted, ballot_num, pvals } ->
-        # IO.puts "PVALS IN LEADER #{inspect pvals}"
         proposals = Map.get(state, :proposals)
         proposals = triangle_function(proposals, pmax(pvals))
         state = %{ state | proposals: proposals }

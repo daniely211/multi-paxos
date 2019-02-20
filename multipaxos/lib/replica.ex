@@ -3,10 +3,9 @@
 defmodule Replica do
   def start(config, database, monitor) do
     state = %{
-      clients: MapSet.new(),
       slot_in: 1,
       slot_out: 1,
-      window: 10,
+      window: 1,
       requests: MapSet.new(),
       proposals: MapSet.new(),
       decisions: MapSet.new(),
@@ -54,7 +53,7 @@ defmodule Replica do
     end
   end
 
-  def perform(state, { client, cid, op }, config) do
+  def perform(state, { _client, _cid, op }, config) do
     slot_out = Map.get(state, :slot_out)
 
     if Enum.any?(Map.get(state, :decisions), fn { s, _c } -> s < slot_out end) do
@@ -62,8 +61,10 @@ defmodule Replica do
       decisions_ready(state, config)
     else
       # TODO
+      IO.puts "Sending database the OP #{inspect op}"
       database = Map.get(state, :database)
       send database, { :execute, op }
+      state = %{ state | slot_out: slot_out + 1 }
 
       # TODO:
       # atomic:
@@ -84,6 +85,7 @@ defmodule Replica do
         # send monitor
         monitor = Map.get(config, :monitor)
         server_num = Map.get(config, :server_num)
+        # IO.puts "I AM SERVER#{inspect server_num} i got a message from client"
         send monitor, { :client_request, server_num}
         propose(state, config)
 
