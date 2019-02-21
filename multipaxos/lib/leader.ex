@@ -37,11 +37,15 @@ defmodule Leader do
   end
 
   def listen(state) do
+    pid = self()
     receive do
       { :propose, slot_no, com } ->
+        # IO.puts "I AM LEAEDER #{inspect pid}, got a proposal #{inspect com} "
+
         active = Map.get(state, :active)
         proposals = Map.get(state, :proposals)
 
+        # Leader will only accept the proposal if there arent any conflicting proposals in the same time slot
         proposal_exists = Enum.any?(proposals, fn { p_slot_no, _c } ->
           p_slot_no == slot_no
         end)
@@ -49,15 +53,16 @@ defmodule Leader do
         if not proposal_exists do
           proposals = MapSet.put(proposals, { slot_no, com })
           state = %{ state | proposals: proposals }
-
+          # no conflicting proposal, will spawn a commander if leader is active.
+          IO.puts "I AM LEAEDER #{inspect pid}, no conflicting proposal"
           if active do
+            IO.puts "I AM LEAEDER #{inspect pid}, no conflicting proposal, will spawn a commander for proposal #{inspect com}"
             acceptors = Map.get(state, :acceptors)
             replicas = Map.get(state, :replicas)
             ballot_number = Map.get(state, :ballot_number)
             message = { ballot_number, slot_no, com }
             spawn(Commander, :start, [self(), acceptors, replicas, message])
           end
-
           listen(state)
         end
 
@@ -68,6 +73,9 @@ defmodule Leader do
         proposals = triangle_function(proposals, pmax(pvals))
         state = %{ state | proposals: proposals }
 
+        # for the first round of scouts that send adopted, there will be no proposals since clients hasnt started sending
+        # Here leader loops through the proposals sent by the replica which got it from client
+        # and spawn a comander PER proposal.
         Enum.each(proposals, fn { p_slot_no, p_com } ->
           acceptors = Map.get(state, :acceptors)
           replicas = Map.get(state, :replicas)
@@ -82,10 +90,11 @@ defmodule Leader do
         { b_num, _ } = Map.get(state, :ballot_number)
 
         if r_ballot_number > b_num do
+          # it is no longer possible to use current b_num to choose a command.
           state = %{ state | active: false, ballot_number: { r_ballot_number + 1, self() } }
           acceptors = Map.get(state, :acceptors)
           ballot_number = Map.get(state, :ballot_number)
-
+          # spawn a new scout with a new ballot number which is the r_ballot_number + 1
           spawn(Scout, :start, [self(), acceptors, ballot_number])
           listen(state)
         end

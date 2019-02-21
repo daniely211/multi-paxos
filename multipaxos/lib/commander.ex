@@ -15,7 +15,6 @@ defmodule Commander do
       send acceptor, { :p2a, self(), message }
     end
     listen(state, acceptors)
-    pid = self()
   end
 
   def listen(state, waitfor) do
@@ -40,6 +39,7 @@ defmodule Commander do
             listen(state, waitfor)
           end
         else
+          # ballot number must be larger than current b than so the commander will tell leader he will not wait for more
           send Map.get(state, :leader), { :preempted, b_suggest }
           # do not recurse here
         end

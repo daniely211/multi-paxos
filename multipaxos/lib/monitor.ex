@@ -43,7 +43,7 @@ defp next config, clock, requests, updates, transactions, scouts, commanders do
   { :client_request, server_num } ->  # client requests seen by replicas
     seen = Map.get requests, server_num, 0
     requests = Map.put requests, server_num, seen + 1
-    IO.puts "MONITOR: #{inspect server_num} GOT A CLIENT REQUEST"
+    # IO.puts "MONITOR: #{inspect server_num} GOT A CLIENT REQUEST"
     next config, clock, requests, updates, transactions, scouts, commanders
 
   { :scout_spawned, server_num } -> # increment active scouts

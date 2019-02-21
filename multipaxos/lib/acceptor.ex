@@ -6,10 +6,10 @@ defmodule Acceptor do
   end
 
   def listen(config, curr_ballot, accepted) do
-    pid = self()
+    # pid = self()
 
     receive do
-      { :p1a, scout_pid, ballot_suggest } ->
+      { :p1a, scout_pid, { ballot_suggest, _pid } } ->
         if ballot_suggest > curr_ballot do
           send scout_pid, { :p1b, self(), ballot_suggest, accepted }
           listen(config, ballot_suggest, accepted)
@@ -19,7 +19,6 @@ defmodule Acceptor do
         end
 
       { :p2a, commander_pid, { {ballot_suggest, _pid}, _s, _c } = package} ->
-        pid = self()
         if ballot_suggest == curr_ballot do
           listen(config, curr_ballot, MapSet.put(accepted, package))
         else

@@ -34,12 +34,14 @@ defmodule Replica do
 
       # if there are no decisions with the current slot numbe
       if not Enum.any?(decisions, fn { s, _cmd } -> s == slot_in end) do
+        # get a random request
         req_arb = Enum.random(requests)
         requests = MapSet.delete(requests, req_arb)
+        # add to proposal
         proposals = MapSet.put(proposals, { slot_in, req_arb })
 
         state = %{ state | proposals: proposals, requests: requests }
-
+        # send the leaders this request
         for leader <- leaders, do: send leader, { :propose, slot_in, req_arb }
 
         state = %{ state | slot_out: slot_out + 1 }
@@ -90,6 +92,7 @@ defmodule Replica do
         propose(state, config)
 
       { :decision, d_slot_no, d_cmd } ->
+        IO.puts "RECEIVED A DECISION TO DO #{inspect d_cmd}"
         decisions = Map.get(state, :decisions)
         decisions = MapSet.put(decisions, { d_slot_no, d_cmd })
         state = %{ state | decisions: decisions }
