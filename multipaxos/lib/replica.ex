@@ -53,25 +53,22 @@ defmodule Replica do
     end
   end
 
-  def perform(state, { _client, _cid, op }, config) do
+  def perform(state, { client, cid, op } = cmd, config) do
     slot_out = Map.get(state, :slot_out)
 
-    if Enum.any?(Map.get(state, :decisions), fn { s, _c } -> s < slot_out end) do
+
+
+    if Enum.any?(Map.get(state, :decisions), fn { s, c } -> s < slot_out and c == cmd end) do
+      # IO.puts "COMMAND HAS BEEN EXECUTED AND IT IS IN THE PAST"
+
       state = %{ state | slot_out: slot_out + 1 }
       decisions_ready(state, config)
     else
-      # TODO
       # IO.puts "Sending database the OP #{inspect op}"
       database = Map.get(state, :database)
       send database, { :execute, op }
       state = %{ state | slot_out: slot_out + 1 }
 
-      # TODO:
-      # atomic:
-        # state = next
-        # slot_out += 1
-
-      # send client, { :response, cid, result }
       decisions_ready(state, config)
     end
   end
