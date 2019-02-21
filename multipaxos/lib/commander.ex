@@ -19,7 +19,8 @@ defmodule Commander do
 
   def listen(state, waitfor) do
     receive do
-      { :p2b, acceptor_pid, {b_suggest, _pid} } ->
+      { :p2b, acceptor_pid, b_suggest } ->
+        # IO.puts "GOT p2b"
         pid = self()
         {curr_ball, _} = Map.get(state, :ballot)
         if b_suggest == curr_ball do
@@ -29,9 +30,9 @@ defmodule Commander do
 
             replicas = Map.get(state, :replicas)
             cmd = Map.get(state, :command)
-            IO.puts "DECISION BEEN MADE! for ballot num: #{inspect curr_ball} to execute command #{inspect cmd}"
+            # IO.puts "DECISION BEEN MADE! for ballot num: #{inspect curr_ball} to execute command #{inspect cmd}"
             for replica <- replicas do
-              IO.puts "I AM #{inspect pid} SENDING TO REPLICA #{inspect replica} about cmd #{inspect cmd}"
+              # IO.puts "I AM #{inspect pid} SENDING TO REPLICA #{inspect replica} about cmd #{inspect cmd}"
               send replica, { :decision, Map.get(state, :slot_num), cmd }
               # do not recurse here
             end

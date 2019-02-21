@@ -31,7 +31,6 @@ defmodule Replica do
     leaders = Map.get(state, :leaders)
 
     if slot_in < slot_out + window and MapSet.size(requests) > 0 do
-
       # if there are no decisions with the current slot numbe
       if not Enum.any?(decisions, fn { s, _cmd } -> s == slot_in end) do
         # get a random request
@@ -43,11 +42,10 @@ defmodule Replica do
         state = %{ state | proposals: proposals, requests: requests }
         # send the leaders this request
         for leader <- leaders, do: send leader, { :propose, slot_in, req_arb }
-
-        state = %{ state | slot_out: slot_out + 1 }
+        state = %{ state | slot_in: slot_in + 1 }
         propose(state, config)
       else
-        state = %{ state | slot_out: slot_out + 1 }
+        state = %{ state | slot_in: slot_in + 1 }
         propose(state, config)
       end
     else
@@ -63,7 +61,7 @@ defmodule Replica do
       decisions_ready(state, config)
     else
       # TODO
-      IO.puts "Sending database the OP #{inspect op}"
+      # IO.puts "Sending database the OP #{inspect op}"
       database = Map.get(state, :database)
       send database, { :execute, op }
       state = %{ state | slot_out: slot_out + 1 }
@@ -92,7 +90,7 @@ defmodule Replica do
         propose(state, config)
 
       { :decision, d_slot_no, d_cmd } ->
-        IO.puts "RECEIVED A DECISION TO DO #{inspect d_cmd}"
+        # IO.puts "RECEIVED A DECISION TO DO #{inspect d_cmd}, slot num at #{inspect d_slot_no}"
         decisions = Map.get(state, :decisions)
         decisions = MapSet.put(decisions, { d_slot_no, d_cmd })
         state = %{ state | decisions: decisions }
@@ -110,7 +108,7 @@ defmodule Replica do
     d_ready = Enum.filter(decisions, fn { slot_num, _c } -> slot_out == slot_num end)
     # find all the cmd in the decision that are ready
     if length(d_ready) > 0 do
-
+      # IO.puts "THERE ARE DECISIONS READY"
       { _s, cmd_p } = Enum.random(d_ready)
 
       # there is at least 1 ready

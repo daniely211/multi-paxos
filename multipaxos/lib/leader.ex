@@ -54,9 +54,9 @@ defmodule Leader do
           proposals = MapSet.put(proposals, { slot_no, com })
           state = %{ state | proposals: proposals }
           # no conflicting proposal, will spawn a commander if leader is active.
-          IO.puts "I AM LEAEDER #{inspect pid}, no conflicting proposal"
+          # IO.puts "I AM LEAEDER #{inspect pid}, no conflicting proposal"
           if active do
-            IO.puts "I AM LEAEDER #{inspect pid}, no conflicting proposal, will spawn a commander for proposal #{inspect com}"
+            # IO.puts "I AM LEAEDER #{inspect pid}, no conflicting proposal, will spawn a commander for proposal #{inspect com}"
             acceptors = Map.get(state, :acceptors)
             replicas = Map.get(state, :replicas)
             ballot_number = Map.get(state, :ballot_number)
@@ -69,6 +69,7 @@ defmodule Leader do
         listen(state)
 
       { :adopted, ballot_num, pvals } ->
+        # IO.puts "GOT ADDOPTED MESSAGE"
         proposals = Map.get(state, :proposals)
         proposals = triangle_function(proposals, pmax(pvals))
         state = %{ state | proposals: proposals }

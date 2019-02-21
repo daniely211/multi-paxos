@@ -20,7 +20,8 @@ defmodule Scout do
   def listen(state, waitfor) do
     receive do
       { :p1b, acceptor_pid, ballot_suggest, p_val } ->
-        if ballot_suggest == Map.get(state, :ballot_num) do
+        { b_num, _pid } = Map.get(state, :ballot_num)
+        if ballot_suggest == b_num do
 
           pvalues = Map.get(state, :pvalues)
           pvalues = MapSet.union(pvalues, p_val)

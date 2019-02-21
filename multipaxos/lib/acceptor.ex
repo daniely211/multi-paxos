@@ -19,12 +19,15 @@ defmodule Acceptor do
         end
 
       { :p2a, commander_pid, { {ballot_suggest, _pid}, _s, _c } = package} ->
+        # IO.puts "GOT p2a for #{inspect ballot_suggest}, curr ballot is #{inspect curr_ballot} "
         if ballot_suggest == curr_ballot do
-          listen(config, curr_ballot, MapSet.put(accepted, package))
-        else
+          # IO.puts "SENDING p2b ballot is the same"
           send commander_pid, { :p2b, self(), curr_ballot }
-          listen(config, curr_ballot, accepted)
+          listen(config, curr_ballot, MapSet.put(accepted, package))
         end
+        # IO.puts "SENDING p2b "
+        send commander_pid, { :p2b, self(), curr_ballot }
+        listen(config, curr_ballot, accepted)
     end
   end
 end
