@@ -9,12 +9,15 @@ defmodule Leader do
       acceptors: MapSet.new(),
       replicas: MapSet.new()
     }
+    monitor = Map.get(config, :monitor)
+    server_num = Map.get(config, :server_num)
 
     receive do
       { :leader_bind_acc_repl, acceptors, replicas } ->
         state = %{ state | acceptors: acceptors, replicas: replicas }
-        spawn(Scout, :start, [self(), acceptors, Map.get(state, :ballot_number)])
-        listen(state)
+        spawn(Scout, :start, [config, self(), acceptors, Map.get(state, :ballot_number)])
+        send monitor,{ :scout_spawned, server_num  }
+        listen(config, state, 0)
     end
   end
 
@@ -36,8 +39,10 @@ defmodule Leader do
     max_pvals
   end
 
-  def listen(state) do
-    pid = self()
+  def listen(config, state, timeout) do
+    # pid = self()
+    monitor = Map.get(config, :monitor)
+    server_num = Map.get(config, :server_num)
     receive do
       { :propose, slot_no, com } ->
         # IO.puts "I AM LEAEDER #{inspect pid}, got a proposal #{inspect com} "
@@ -61,14 +66,17 @@ defmodule Leader do
             replicas = Map.get(state, :replicas)
             ballot_number = Map.get(state, :ballot_number)
             message = { ballot_number, slot_no, com }
-            spawn(Commander, :start, [self(), acceptors, replicas, message])
+            spawn(Commander, :start, [config, self(), acceptors, replicas, message])
+            send monitor,{ :commander_spawned, server_num  }
           end
-          listen(state)
+          listen(config, state, timeout)
         end
 
-        listen(state)
+        listen(config, state, timeout)
 
-      { :adopted, ballot_num, pvals } ->
+      { :adopted, ballot_pair, pvals } ->
+        # timeout gets halved
+        # timeout = timeout / 2
         # IO.puts "GOT ADDOPTED MESSAGE"
         proposals = Map.get(state, :proposals)
         proposals = triangle_function(proposals, pmax(pvals))
@@ -80,27 +88,30 @@ defmodule Leader do
         Enum.each(proposals, fn { p_slot_no, p_com } ->
           acceptors = Map.get(state, :acceptors)
           replicas = Map.get(state, :replicas)
-          message = { ballot_num, p_slot_no, p_com }
-          spawn(Commander, :start, [self(), acceptors, replicas, message])
+          message = { ballot_pair, p_slot_no, p_com }
+          spawn(Commander, :start, [config, self(), acceptors, replicas, message])
+          send monitor,{ :commander_spawned, server_num  }
         end)
 
         state = %{ state | active: true }
-        listen(state)
+        listen(config, state, timeout)
 
-      { :preempted, { r_ballot_number, _r_pid } } ->
-        { b_num, _ } = Map.get(state, :ballot_number)
+      { :preempted, { r_ballot_number, r_pid } = ballot_pair_suggest } ->
+        # timeout = timeout + 1
+        # Process.sleep(timeout)
+        cur_ballot_pair = Map.get(state, :ballot_number)
 
-        if r_ballot_number > b_num do
+        if ballot_pair_suggest > cur_ballot_pair do
           # it is no longer possible to use current b_num to choose a command.
           state = %{ state | active: false, ballot_number: { r_ballot_number + 1, self() } }
           acceptors = Map.get(state, :acceptors)
-          ballot_number = Map.get(state, :ballot_number)
           # spawn a new scout with a new ballot number which is the r_ballot_number + 1
-          spawn(Scout, :start, [self(), acceptors, ballot_number])
-          listen(state)
+          spawn(Scout, :start, [config, self(), acceptors, cur_ballot_pair])
+          send monitor,{ :scout_spawned, server_num }
+          listen(config, state, timeout)
         end
 
-        listen(state)
+        listen(config, state, timeout)
     end
   end
 

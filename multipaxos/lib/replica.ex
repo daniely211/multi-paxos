@@ -12,7 +12,7 @@ defmodule Replica do
       leaders: MapSet.new(),
       database: database
     }
-
+    server_num = Map.get(config, :server_num)
     receive do
       { :replica_bind_leader, leaders } ->
         { _, s } = Map.get_and_update(state, :leaders, fn val -> { val, leaders } end)
@@ -56,7 +56,7 @@ defmodule Replica do
   def perform(state, { client, cid, op } = cmd, config) do
     slot_out = Map.get(state, :slot_out)
     decisions = Map.get(state, :decisions)
-
+    server_num = Map.get(config, :server_num)
 
     # IO.puts "NEED TO PERFORM #{inspect cmd}, at #{inspect slot_out}, decisions are #{inspect decisions}"
 
@@ -66,13 +66,11 @@ defmodule Replica do
       state = %{ state | slot_out: slot_out + 1 }
       decisions_ready(state, config)
     else
-      # IO.puts "Sending database the OP #{inspect op}"
-      # TODO ATOMIC
+      # IO.puts "I AM SERVER #{inspect server_num}Sending database the OP #{inspect op} slot out is #{inspect slot_out}"
 
       database = Map.get(state, :database)
       send database, { :execute, op }
       state = %{ state | slot_out: slot_out + 1 }
-      # END ATOMIC
       decisions_ready(state, config)
     end
   end
