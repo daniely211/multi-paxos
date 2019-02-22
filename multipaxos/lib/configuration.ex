@@ -7,7 +7,7 @@ defmodule Configuration do
 
 def version :default do
   %{
-  debug_level:  0, 		# debug level 0
+  debug_level:  1, 		# debug level 0
   docker_delay: 1_000,		# time (ms) to wait for containers to start up
 
   max_requests: 50_000,		# max requests each client will make
