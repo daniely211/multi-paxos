@@ -92,6 +92,7 @@ defmodule Leader do
           spawn(Commander, :start, [config, self(), acceptors, replicas, message])
           send monitor,{ :commander_spawned, server_num  }
         end)
+        IO.puts "LEADER GOING TO ACTIVE #{inspect server_num}"
 
         state = %{ state | active: true }
         listen(config, state, timeout)
@@ -103,6 +104,7 @@ defmodule Leader do
 
         if ballot_pair_suggest > cur_ballot_pair do
           # it is no longer possible to use current b_num to choose a command.
+          IO.puts "LEADER GOING TO PASSIVE #{inspect server_num}"
           state = %{ state | active: false, ballot_number: { r_ballot_number + 1, self() } }
           acceptors = Map.get(state, :acceptors)
           # spawn a new scout with a new ballot number which is the r_ballot_number + 1

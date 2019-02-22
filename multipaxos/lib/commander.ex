@@ -37,14 +37,14 @@ defmodule Commander do
               send replica, { :decision, slot_num, cmd }
               # IO.puts "Sending command #{inspect cmd}, at slot number #{inspect slot_num}"
             end
-            send monitor, { :commander_finished, server_num }
+            # send monitor, { :commander_finished, server_num }
           else
             listen(state, waitfor, config)
           end
         else
           # ballot number must be larger than current b than so the commander will tell leader he will not wait for more
           send Map.get(state, :leader), { :preempted, b_suggest }
-          send monitor, { :commander_finished, server_num }
+          # send monitor, { :commander_finished, server_num }
 
         end
     end
