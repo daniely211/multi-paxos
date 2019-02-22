@@ -37,9 +37,8 @@ defp next config, clock, requests, updates, transactions, scouts, commanders, cl
         transactions
       end # case
 
-    clients = Map.put clients, client_num, seqnum
-    # clients = Map.put clients, client_num, clients_done + 1
-
+    clients_done = Map.get clients, client_num, 0
+    clients = Map.put clients, client_num, clients_done + 1
     updates = Map.put updates, db, seqnum
     next config, clock, requests, updates, transactions, scouts, commanders, clients
 
