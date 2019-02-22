@@ -33,7 +33,7 @@ defmodule Client do
       transaction  = { :move, amount, account1, account2 }
 
       sent = sent + 1
-      cmd = { self(), sent, transaction }
+      cmd = { client_num, sent, transaction }
 
       for r <- 1..quorum do
         replica = Enum.at replicas, rem(sent+r, config.n_servers)

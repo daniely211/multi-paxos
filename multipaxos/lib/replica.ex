@@ -31,7 +31,7 @@ defmodule Replica do
     leaders = Map.get(state, :leaders)
 
     if slot_in < slot_out + window and MapSet.size(requests) > 0 do
-      # if there are no decisions with the current slot numbe
+      # if there are no decisions with the current slot number
       if not Enum.any?(decisions, fn { s, _cmd } -> s == slot_in end) do
         # get a random request
         req_arb = Enum.random(requests)
@@ -53,23 +53,18 @@ defmodule Replica do
     end
   end
 
-  def perform(state, { client, cid, op } = cmd, config) do
+  def perform(state, { client_num, _cid, op } = cmd, config) do
     slot_out = Map.get(state, :slot_out)
     decisions = Map.get(state, :decisions)
     server_num = Map.get(config, :server_num)
 
-    # IO.puts "NEED TO PERFORM #{inspect cmd}, at #{inspect slot_out}, decisions are #{inspect decisions}"
-
     if Enum.any?(decisions, fn { s, c } -> s < slot_out and c == cmd end) do
-      # IO.puts "COMMAND HAS BEEN EXECUTED AND IT IS IN THE PAST"
-
       state = %{ state | slot_out: slot_out + 1 }
       decisions_ready(state, config)
     else
-      # IO.puts "I AM SERVER #{inspect server_num}Sending database the OP #{inspect op} slot out is #{inspect slot_out}"
 
       database = Map.get(state, :database)
-      send database, { :execute, op }
+      send database, { :execute, op, client_num }
       state = %{ state | slot_out: slot_out + 1 }
       decisions_ready(state, config)
     end
@@ -84,12 +79,10 @@ defmodule Replica do
         # send monitor
         monitor = Map.get(config, :monitor)
         server_num = Map.get(config, :server_num)
-        # IO.puts "I AM SERVER#{inspect server_num} i got a message from client"
         send monitor, { :client_request, server_num}
         propose(state, config)
 
       { :decision, d_slot_no, d_cmd } ->
-        # IO.puts "RECEIVED A DECISION TO DO #{inspect d_cmd}, slot num at #{inspect d_slot_no}"
         decisions = Map.get(state, :decisions)
         decisions = MapSet.put(decisions, { d_slot_no, d_cmd })
         state = %{ state | decisions: decisions }

@@ -34,13 +34,13 @@ defmodule Scout do
             # a majority has been reached, so send the decision aroun to all the replica
             pvals = Map.get(state, :pvalues)
             send Map.get(state, :leader), { :adopted, ballot_pair, pvals }
-            # send monitor, { :scout_finished, server_num }
+            send monitor, { :scout_finished, server_num }
           else
             listen(state, waitfor, config)
           end
         else
           send Map.get(state, :leader), { :preempted, ballot_suggest }
-          # send monitor, { :scout_finished, server_num }
+          send monitor, { :scout_finished, server_num }
         end
     end
   end

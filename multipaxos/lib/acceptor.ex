@@ -11,6 +11,7 @@ defmodule Acceptor do
     receive do
       { :p1a, scout_pid, ballot_pair } ->
         if ballot_pair > curr_ballot do
+          # IO.puts "WOW ballot is bigger than cur_ballot #{inspect ballot_pair}, #{inspect curr_ballot}"
           send scout_pid, { :p1b, self(), ballot_pair, accepted }
           listen(config, ballot_pair, accepted)
         else

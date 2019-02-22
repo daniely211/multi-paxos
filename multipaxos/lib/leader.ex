@@ -40,7 +40,6 @@ defmodule Leader do
   end
 
   def listen(config, state, timeout) do
-    # pid = self()
     monitor = Map.get(config, :monitor)
     server_num = Map.get(config, :server_num)
     receive do
@@ -75,8 +74,9 @@ defmodule Leader do
         listen(config, state, timeout)
 
       { :adopted, ballot_pair, pvals } ->
-        # timeout gets halved
-        # timeout = timeout / 2
+        # timeout should decrease linearly
+        timeout = max(0, timeout - 5)
+
         # IO.puts "GOT ADDOPTED MESSAGE"
         proposals = Map.get(state, :proposals)
         proposals = triangle_function(proposals, pmax(pvals))
@@ -92,23 +92,26 @@ defmodule Leader do
           spawn(Commander, :start, [config, self(), acceptors, replicas, message])
           send monitor,{ :commander_spawned, server_num  }
         end)
-        IO.puts "LEADER GOING TO ACTIVE #{inspect server_num}"
+        # IO.puts "LEADER GOING TO ACTIVE #{inspect server_num}"
 
         state = %{ state | active: true }
         listen(config, state, timeout)
 
-      { :preempted, { r_ballot_number, r_pid } = ballot_pair_suggest } ->
-        # timeout = timeout + 1
-        # Process.sleep(timeout)
+      { :preempted, { r_ballot_number, _r_pid } = ballot_pair_suggest } ->
+        timeout = 1 + round(timeout * 1.05)
+        Process.sleep(timeout)
+
         cur_ballot_pair = Map.get(state, :ballot_number)
 
         if ballot_pair_suggest > cur_ballot_pair do
           # it is no longer possible to use current b_num to choose a command.
-          IO.puts "LEADER GOING TO PASSIVE #{inspect server_num}"
+          # IO.puts "LEADER GOING TO PASSIVE #{inspect server_num}"
           state = %{ state | active: false, ballot_number: { r_ballot_number + 1, self() } }
           acceptors = Map.get(state, :acceptors)
+          new_ballot_pair = Map.get(state, :ballot_number)
+
           # spawn a new scout with a new ballot number which is the r_ballot_number + 1
-          spawn(Scout, :start, [config, self(), acceptors, cur_ballot_pair])
+          spawn(Scout, :start, [config, self(), acceptors, new_ballot_pair])
           send monitor,{ :scout_spawned, server_num }
           listen(config, state, timeout)
         end

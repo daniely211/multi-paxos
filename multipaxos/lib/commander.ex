@@ -23,28 +23,24 @@ defmodule Commander do
     slot_num = Map.get(state, :slot_num)
     receive do
       { :p2b, acceptor_pid, b_suggest } ->
-        # IO.puts "GOT p2b"
-        pid = self()
         curr_ball_pair = Map.get(state, :ballot)
         if b_suggest == curr_ball_pair do
           waitfor = List.delete(waitfor, acceptor_pid)
           if length(waitfor) < (length(Map.get(state, :acceptors)) / 2) do
             # a majority has been reached, so send the decision aroun to all the replica
-
             replicas = Map.get(state, :replicas)
             cmd = Map.get(state, :command)
             for replica <- replicas do
               send replica, { :decision, slot_num, cmd }
-              # IO.puts "Sending command #{inspect cmd}, at slot number #{inspect slot_num}"
             end
-            # send monitor, { :commander_finished, server_num }
+            send monitor, { :commander_finished, server_num }
           else
             listen(state, waitfor, config)
           end
         else
           # ballot number must be larger than current b than so the commander will tell leader he will not wait for more
           send Map.get(state, :leader), { :preempted, b_suggest }
-          # send monitor, { :commander_finished, server_num }
+          send monitor, { :commander_finished, server_num }
 
         end
     end
