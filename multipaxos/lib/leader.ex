@@ -17,7 +17,7 @@ defmodule Leader do
         state = %{ state | acceptors: acceptors, replicas: replicas }
         spawn(Scout, :start, [config, self(), acceptors, Map.get(state, :ballot_number)])
         send monitor,{ :scout_spawned, server_num  }
-        listen(config, state, 0)
+        listen(config, state, 1)
     end
   end
 
@@ -44,7 +44,6 @@ defmodule Leader do
     server_num = Map.get(config, :server_num)
     receive do
       { :propose, slot_no, com } ->
-        # IO.puts "I AM LEAEDER #{inspect pid}, got a proposal #{inspect com} "
 
         active = Map.get(state, :active)
         proposals = Map.get(state, :proposals)
@@ -58,9 +57,7 @@ defmodule Leader do
           proposals = MapSet.put(proposals, { slot_no, com })
           state = %{ state | proposals: proposals }
           # no conflicting proposal, will spawn a commander if leader is active.
-          # IO.puts "I AM LEAEDER #{inspect pid}, no conflicting proposal"
           if active do
-            # IO.puts "I AM LEAEDER #{inspect pid}, no conflicting proposal, will spawn a commander for proposal #{inspect com}"
             acceptors = Map.get(state, :acceptors)
             replicas = Map.get(state, :replicas)
             ballot_number = Map.get(state, :ballot_number)
@@ -74,10 +71,12 @@ defmodule Leader do
         listen(config, state, timeout)
 
       { :adopted, ballot_pair, pvals } ->
-        # timeout should decrease linearly
+        # MIAD
         timeout = max(0, timeout - 5)
 
-        # IO.puts "GOT ADDOPTED MESSAGE"
+        # AIMD
+        # timeout = round(timeout  / 2)
+
         proposals = Map.get(state, :proposals)
         proposals = triangle_function(proposals, pmax(pvals))
         state = %{ state | proposals: proposals }
@@ -92,20 +91,24 @@ defmodule Leader do
           spawn(Commander, :start, [config, self(), acceptors, replicas, message])
           send monitor,{ :commander_spawned, server_num  }
         end)
-        # IO.puts "LEADER GOING TO ACTIVE #{inspect server_num}"
 
         state = %{ state | active: true }
         listen(config, state, timeout)
 
       { :preempted, { r_ballot_number, _r_pid } = ballot_pair_suggest } ->
-        timeout = 1 + round(timeout * 1.05)
+
+        # MIAD
+        timeout = 1 + round(timeout * 4)
+
+        # AIMD
+        # timeout = timeout + 50
+
         Process.sleep(timeout)
 
         cur_ballot_pair = Map.get(state, :ballot_number)
 
         if ballot_pair_suggest > cur_ballot_pair do
           # it is no longer possible to use current b_num to choose a command.
-          # IO.puts "LEADER GOING TO PASSIVE #{inspect server_num}"
           state = %{ state | active: false, ballot_number: { r_ballot_number + 1, self() } }
           acceptors = Map.get(state, :acceptors)
           new_ballot_pair = Map.get(state, :ballot_number)
