@@ -1,7 +1,7 @@
 # Daniel Yung (lty16) Tim Green (tpg16)
 
 defmodule Replica do
-  def start(config, database, monitor) do
+  def start(config, database) do
     state = %{
       slot_in: 1,
       slot_out: 1,
@@ -12,7 +12,6 @@ defmodule Replica do
       leaders: MapSet.new(),
       database: database
     }
-    server_num = Map.get(config, :server_num)
     receive do
       { :replica_bind_leader, leaders } ->
         { _, s } = Map.get_and_update(state, :leaders, fn val -> { val, leaders } end)
@@ -56,7 +55,6 @@ defmodule Replica do
   def perform(state, { client_num, _cid, op } = cmd, config) do
     slot_out = Map.get(state, :slot_out)
     decisions = Map.get(state, :decisions)
-    server_num = Map.get(config, :server_num)
 
     if Enum.any?(decisions, fn { s, c } -> s < slot_out and c == cmd end) do
       state = %{ state | slot_out: slot_out + 1 }
@@ -100,7 +98,6 @@ defmodule Replica do
     d_ready = Enum.filter(decisions, fn { slot_num, _c } -> slot_out == slot_num end)
     # find all the cmd in the decision that are ready
     if length(d_ready) > 0 do
-      # IO.puts "THERE ARE DECISIONS READY"
       { _s, cmd_p } = Enum.random(d_ready)
 
       # there is at least 1 ready

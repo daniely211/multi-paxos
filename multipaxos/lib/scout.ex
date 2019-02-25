@@ -8,10 +8,8 @@ defmodule Scout do
       ballot_num: ballot_num,
       pvalues: MapSet.new()
     }
-    pid = self()
     for acceptor <- acceptors do
       send acceptor, { :p1a, self(), ballot_num }
-      # IO.puts "#{inspect pid} Sending p1a to #{inspect acceptor}"
     end
     listen(state, acceptors, config)
 
