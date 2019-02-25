@@ -1,7 +1,7 @@
+# Daniel Yung (lty16) Tim Green (tpg16)
 
 # distributed algorithms, n.dulay 11 feb 19
 # coursework 2, paxos made moderately complex
-# Daniel Yung (lty16) Tim Green (tpg16)
 
 defmodule Client do
 

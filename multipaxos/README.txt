@@ -1,3 +1,4 @@
+# Daniel Yung (lty16) Tim Green (tpg16)
 
 # distributed algorithms, n.dulay, 11 feb 19
 # coursework 2, multi-paxos
@@ -32,4 +33,8 @@ make show	- list docker containers and networks
 
 make gen	- generate docker-compose.yml file
 
+
+TIMEOUT FOR LEADER
+----------------
+Within the leader.ex file, there are commented out code supporting different styles of timeout in the :adopted message block and :preempted message block.
 

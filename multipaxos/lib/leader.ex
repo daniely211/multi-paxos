@@ -98,7 +98,7 @@ defmodule Leader do
       { :preempted, { r_ballot_number, _r_pid } = ballot_pair_suggest } ->
 
         # MIAD
-        timeout = 1 + round(timeout * 4)
+        timeout = 1 + round(timeout * 1.05)
 
         # AIMD
         # timeout = timeout + 50
