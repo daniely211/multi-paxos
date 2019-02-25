@@ -77,7 +77,15 @@ defp next config, clock, requests, updates, transactions, scouts, commanders, cl
     if config.debug_level == 1 do
       min_done = updates |> Map.values |> Enum.min
       n_requests = requests |> Map.values |> Enum.sum
-      IO.puts "time = #{clock}    total seen = #{n_requests} max lag = #{n_requests-min_done}"
+
+      case config.client_send do
+        :round_robin ->
+          IO.puts "time = #{clock}    total seen = #{n_requests} max lag = #{n_requests - min_done}"
+        :quorum ->
+          IO.puts "time = #{clock}    total seen = #{n_requests} max lag = #{(div(n_requests, div(config.n_servers + 1, 2))) - min_done}"
+        :broadcast ->
+          IO.puts "time = #{clock}    total seen = #{n_requests} max lag = #{div(n_requests, config.n_servers) - min_done}"
+      end
 
       sorted = scouts |> Map.to_list |> List.keysort(0)
       IO.puts "time = #{clock}        scouts = #{inspect sorted}"
