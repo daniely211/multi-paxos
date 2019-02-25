@@ -13,7 +13,7 @@ def version :default do
   max_requests: 50_000,		# max requests each client will make
   client_sleep: 5,		# time (ms) to sleep before sending new request
   client_stop:  60_000,		# time (ms) to stop sending further requests
-  client_send:	:quorum,	# :round_robin, :quorum or :broadcast
+  client_send:	:round_robin,	# :round_robin, :quorum or :broadcast
 
   n_accounts:   100,		# number of active bank accounts
   max_amount:   1_000,		# max amount moved between accounts
